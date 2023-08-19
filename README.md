@@ -1,2 +1,2 @@
 # Svelte with esbuild
-Just simple SPA
+Just simple Svelte SPA
