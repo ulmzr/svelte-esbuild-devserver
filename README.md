@@ -1,2 +1,2 @@
-# Svelte with esbuild
-Just simple Svelte SPA
+# Malina with esbuild
+Just simple SPA
