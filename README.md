@@ -1,2 +1,2 @@
-# svelte-esbuild-spa
+# Esbuild with svelte
 Svelte SPA
