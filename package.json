@@ -1,6 +1,6 @@
 {
-   "name": "malina-esbuild-devserver",
-   "version": "0.0.1",
+   "name": "svelte-esbuild-devserver",
+   "version": "0.0.2",
    "description": "Just simple SPA",
    "main": "index.js",
    "scripts": {
@@ -8,13 +8,13 @@
    },
    "repository": {
       "type": "git",
-      "url": "git+https://github.com/ulmzr/malina-esbuild-devserver.git"
+      "url": "git+https://github.com/ulmzr/svelte-esbuild-devserver.git"
    },
    "keywords": [],
    "author": "Yulmizar",
    "license": "ISC",
    "bugs": {
-      "url": "https://github.com/ulmzr/malina-esbuild-devserver/issues"
+      "url": "https://github.com/ulmzr/svelte-esbuild-devserver/issues"
    },
    "homepage": "https://github.com/ulmzr/malina-esbuild-devserver#readme",
    "dependencies": {
