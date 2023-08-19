@@ -1,6 +1,6 @@
 {
    "name": "svelte-esbuild-devserver",
-   "version": "0.0.2",
+   "version": "0.0.3",
    "description": "Just simple SPA",
    "main": "index.js",
    "scripts": {
@@ -16,7 +16,7 @@
    "bugs": {
       "url": "https://github.com/ulmzr/svelte-esbuild-devserver/issues"
    },
-   "homepage": "https://github.com/ulmzr/malina-esbuild-devserver#readme",
+   "homepage": "https://github.com/ulmzr/svelte-esbuild-devserver#readme",
    "dependencies": {
       "devlrserver": "^0.0.4",
       "esbuild": "^0.19.2",
