@@ -94,7 +94,7 @@ function watching() {
       })
       .on("unlink", (pathname) => {
          if (!ready) return;
-         addDeleteFile(pathname);
+         // addDeleteFile(pathname);
       })
       .on("addDir", (dir) => {
          if (!ready) return;
@@ -102,9 +102,10 @@ function watching() {
          if (!dir.includes("/pages/") && dir === "src/pages") return;
          createRoutes();
          if (!fs.existsSync(path.join(dir, "pages.js"))) fs.writeFileSync(path.join(dir, "pages.js"), "");
-         if (!fs.existsSync(path.join(dir, "pageIndex.svelte"))) {
-            let content = `<script>\n\timport * as pages from "./pages.js";\n\texport let params = {};\n\tconst page = pages[params.page];\n</script>\n\n{#if page}\n\t<svelte:component this={page} />\n{:else}\n{/if}\n `;
-            fs.writeFileSync(path.join(dir, "pageIndex.svelte"), content);
+         let page = getPage(dir);
+         if (!fs.existsSync(path.join(dir, `${page}Index.svelte`))) {
+            let content = `<script>\n\timport * as pages from "./pages.js";\n\timport { E404 } from "./";\n\texport let params = {};\n\tconst page = pages[params.page];\n</script>\n\n{#if page}\n\t<svelte:component this={page} />\n{:else}\n\t<E404/>\n{/if}\n `;
+            fs.writeFileSync(path.join(dir, `${page}Index.svelte`), content);
          }
       })
       .on("unlinkDir", (path) => {
@@ -143,7 +144,10 @@ function addDeleteFile(pathname) {
 function getCmp(dir, recursive = 0) {
    let res = getFiles(dir, recursive);
    res = res
-      .filter((x) => x.endsWith(".svelte") && !x.includes("pageIndex.svelte"))
+      .filter((x) => {
+         let page = getPage(x);
+         return x.endsWith(".svelte") && !x.includes(`${page}Index.svelte`);
+      })
       .map((x) => {
          let cmp = /(\w+).svelte/g.exec(x);
          x = `export { default as ${cmp[1]} } from ".${x.replace(dir, "")}";\n`;
@@ -167,18 +171,25 @@ function getFiles(dir, recursive = 0) {
    return res;
 }
 
+function getPage(x) {
+   x = x.replace("src/pages/", "");
+   return x.split("/")[0];
+}
+
 function createRoutes() {
    if (!autoroute) return;
    let files = getFiles("src/pages", 1);
    files = files.filter((x) => {
       let f = x.split("/").slice(-1)[0];
-      return x.includes("pageIndex.svelte") || x.includes("Home.svelte") || f[0].match(/[A-Z]/);
+      let page = getPage(x);
+      return x.includes(`${page}Index.svelte`) || x.includes("Home.svelte") || f[0].match(/[A-Z]/);
    });
    files = files.map((x) => {
       let cmp = x.split("/").slice(-1)[0].replace(".svelte", "");
+      let page = getPage(x);
       let content = [
          `import ${cmp} from "${x.replace("src/", "./")}";`,
-         cmp === "Home" ? "/" : x.replace("pageIndex.svelte", ":page"),
+         cmp === "Home" ? "/" : x.replace(`${page}Index.svelte`, ":page"),
          cmp,
       ];
       return content;
