@@ -1,6 +1,6 @@
 {
    "name": "svelte-esbuild-devserver",
-   "version": "0.0.6",
+   "version": "0.0.7",
    "description": "Just simple SPA",
    "main": "index.js",
    "scripts": {
