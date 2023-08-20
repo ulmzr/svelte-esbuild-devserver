@@ -90,70 +90,90 @@ function watching() {
       })
       .on("add", (pathname) => {
          if (!ready) return;
-         addDeleteFile(pathname);
+         createPages(pathname);
+      })
+      .on("change", (pathname) => {
+         if (!ready) return;
+         createPages(pathname);
       })
       .on("unlink", (pathname) => {
          if (!ready) return;
-         // addDeleteFile(pathname);
+         createPages(pathname);
       })
-      .on("addDir", (dir) => {
-         if (!ready) return;
-         dir = dir.replace(/\\/g, "/");
-         if (!dir.includes("/pages/") && dir === "src/pages") return;
+      .on("unlinkDir", (pathname) => {
+         if (!ready || !pathname.includes("pages")) return;
          createRoutes();
-         if (!fs.existsSync(path.join(dir, "pages.js"))) fs.writeFileSync(path.join(dir, "pages.js"), "");
-         let page = getPage(dir);
-         if (!fs.existsSync(path.join(dir, `${page}Index.svelte`))) {
-            let content = `<script>\n\timport * as pages from "./pages.js";\n\timport { E404 } from "./";\n\texport let params = {};\n\tconst page = pages[params.page];\n</script>\n\n{#if page}\n\t<svelte:component this={page} />\n{:else}\n\t<E404/>\n{/if}\n `;
-            fs.writeFileSync(path.join(dir, `${page}Index.svelte`), content);
+      })
+      .on("addDir", (dirpath) => {
+         if (!dirpath.includes("pages")) return;
+         dirpath = dirpath.replace(/\\/g, "/");
+         let content = 'export * from "../components";\nexport * from "../modules";\n';
+         if (dirpath.match(/src\/pages\/\w+/)) {
+            content = `export * from "../"`;
          }
-      })
-      .on("unlinkDir", (path) => {
-         if (!ready || !path.includes("pages")) return;
-         createRoutes();
+         fs.writeFileSync(dirpath + "/index.js", content);
       })
       .on("ready", (path) => {
          ready = true;
       });
 }
 
-function addDeleteFile(pathname) {
-   createRoutes();
-   pathname = pathname.replace(/\\/g, "/");
-   if (!pathname.endsWith(".svelte")) return;
-   let dir = /.*(?<=\/)/.exec(pathname)[0];
-   if (dir[dir.length - 1] === "/") dir = dir.slice(0, -1);
-   let _files = getCmp(dir);
-   let files = _files.filter((x) => {
-      return !x.includes("/+");
-   });
-   let pages = _files.filter((x) => {
-      return x.includes("/+");
-   });
-   files = files.join("");
-   pages = pages.join("");
-   if (dir.includes("pages")) {
-      if (dir === "src/pages") {
-         files += 'export * from "../components";\nexport * from "../modules";\n';
-      } else files += 'export * from "../";\n';
-      if (files) fs.writeFileSync(path.join(dir, "index.js"), files);
-      if (pages) fs.writeFileSync(path.join(dir, "pages.js"), pages);
-   } else fs.writeFileSync(path.join(dir, "index.js"), files);
-}
-
-function getCmp(dir, recursive = 0) {
-   let res = getFiles(dir, recursive);
-   res = res
-      .filter((x) => {
-         let page = getPage(x);
-         return x.endsWith(".svelte") && !x.includes(`${page}Index.svelte`);
-      })
-      .map((x) => {
-         let cmp = /(\w+).svelte/g.exec(x);
-         x = `export { default as ${cmp[1]} } from ".${x.replace(dir, "")}";\n`;
-         return x;
+function createPages(filepath) {
+   if (!filepath.endsWith(".svelte")) return;
+   filepath = filepath.replaceAll("\\", "/");
+   if (filepath.includes("src/pages")) {
+      let p = filepath.replace("src/pages", "");
+      p = p.split("/");
+      let filename = p[p.length - 1];
+      if (filename[0] !== "+") return;
+      let dir = p.slice(0, -1);
+      dir = dir[dir.length - 1];
+      let dirpath = p.slice(0, -1).join("/");
+      let files = getFiles(path.join("src/pages", dirpath));
+      let pagesContent = "";
+      files.map((file) => {
+         if (!file.endsWith(".svelte")) return;
+         let location = file.split("/");
+         location = location[location.length - 1];
+         if (location[0] !== "+") return;
+         let cmp = location
+            .replace(/\+|\.svelte/g, "")
+            .replace(/\-/g, "_")
+            .toLowerCase();
+         pagesContent += `export { default as ${cmp.replace(/\-/g, "_")} } from "./${location}"\n`;
       });
-   return res;
+      fs.writeFileSync(path.join("src/pages", dirpath, "pages.js"), pagesContent);
+      pagesContent = `<script>
+\timport * as pages from "./pages"; 
+\timport { E404 } from "../";
+\texport let params = {};\n
+\tlet page;\n
+\t$: params, page = Object.keys(params).length === 0 ? pages.home : pages[params.page.replace(/\-/g,'_')];
+</script>\n
+{#if page}
+\t<svelte:component this={page} />
+{:else}
+\t<E404/>
+{/if}
+`;
+      fs.writeFileSync(path.join("src/pages", dirpath, "Index.svelte"), pagesContent);
+   } else if (filepath.includes("src/components") || filepath.includes("src/modules")) {
+      let files = getFiles(filepath.split("/").slice(0, -1).join("/"));
+      let content = "";
+      files.map((f) => {
+         let arr = f.split("/");
+         let filename = arr[arr.length - 1];
+         let match = filename.endsWith(".svelte") && filename[0].match(/[A-Z]/);
+         if (match) {
+            let cmp = filename.replace(".svelte", "");
+            content += `export { default as ${cmp} } from "./${filename}";\n`;
+         }
+      });
+      // console.log(">>>", filepath);
+      fs.writeFileSync(filepath.split("/").slice(0, -1).join("/") + "/index.js", content);
+   }
+
+   createRoutes();
 }
 
 function getFiles(dir, recursive = 0) {
@@ -171,47 +191,30 @@ function getFiles(dir, recursive = 0) {
    return res;
 }
 
-function getPage(x) {
-   x = x.replace("src/pages/", "");
-   return x.split("/")[0];
-}
-
 function createRoutes() {
-   if (!autoroute) return;
    let files = getFiles("src/pages", 1);
-   files = files.filter((x) => {
-      let f = x.split("/").slice(-1)[0];
-      let page = getPage(x);
-      return x.includes(`${page}Index.svelte`) || x.includes("Home.svelte") || f[0].match(/[A-Z]/);
-   });
-   files = files.map((x) => {
-      let cmp = x.split("/").slice(-1)[0].replace(".svelte", "");
-      let page = getPage(x);
-      let content = [
-         `import ${cmp} from "${x.replace("src/", "./")}";`,
-         cmp === "Home" ? "/" : x.replace(`${page}Index.svelte`, ":page"),
-         cmp,
-      ];
-      return content;
-   });
-
-   let content = "";
-   for (let i = 0; i < files.length; i++) {
-      content += files[i][0] + "\n";
-   }
-
    files = files.reverse();
-   content += "export default [\n";
-   for (let i = 0; i < files.length; i++) {
-      content +=
-         '\t{ path: "' +
-         files[i][1].replace(/src\/pages|.svelte/g, "").toLowerCase() +
-         '", ' +
-         "page: " +
-         files[i][2] +
-         " },\n";
-   }
-   content += "]";
-
-   fs.writeFileSync("src/routes.js", content);
+   let result1 = "";
+   let result2 = "\nexport default [\n";
+   files = files = files.map((filepath) => {
+      let filename = filepath.split("/");
+      filename = filename[filename.length - 1];
+      let match = filename.endsWith(".svelte") && filename[0].match(/[A-Z]/);
+      if (match) {
+         let cmp1 = filename.replace(".svelte", "");
+         let pathname = filepath
+            .replace(/.svelte|src\/pages/g, "")
+            .toLowerCase()
+            .replace("index", ":page");
+         let cmp2;
+         if (cmp1 === "Index") {
+            cmp2 = filepath.replace("/" + filename, "").split("/");
+            cmp2 = cmp2[cmp2.length - 1] + cmp1;
+         }
+         result1 += `import ${cmp2 ? cmp2 : cmp1} from "${filepath.replace("src", ".")}";\n`;
+         result2 += `\t{ path: "${pathname === "/home" ? "/" : pathname}", page: ${cmp2 ? cmp2 : cmp1} },\n`;
+      }
+   });
+   result2 += "]";
+   fs.writeFileSync("src/routes.js", result1 + result2);
 }
