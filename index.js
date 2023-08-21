@@ -15,11 +15,10 @@ const outdir = env.outdir || "public";
 const esbuildConfig = env.esbuild || {};
 const autoroute = env.autoroute;
 
-let ready;
 const regex = /(.+[^\/])\/(\+.*.svelte)/;
 const regexC = /(.+[^\/])\/([A-Z].*.svelte)/;
 const exist = (filepath) => fs.existsSync(filepath);
-const write = async (filepath, content) => await fsp.writeFile(filepath, content, "utf8");
+const write = (filepath, content) => fs.writeFileSync(filepath, content, "utf8");
 
 serve({
    port,
@@ -28,8 +27,7 @@ serve({
 });
 
 buildApp();
-// createRoutes();
-watching();
+routeAuto();
 
 async function buildApp() {
    const ctx = await esbuild.context({
@@ -84,8 +82,9 @@ function sveltePlugin() {
    };
 }
 
-function watching() {
-   if (!watch) return;
+function routeAuto() {
+   if (!autoroute) return;
+   createRoutes();
    const chokidar = require("chokidar");
    chokidar
       .watch(["src/components", "src/modules", "src/pages"], {
@@ -98,12 +97,12 @@ function watching() {
       .on("add", (path) => createPagesJS(path))
       .on("unlink", (path) => createPagesJS(path))
       .on("unlinkDir", (path) => createRoutes(path))
-      .on("addDir", async (dir) => {
+      .on("addDir", (dir) => {
          if (!dir.includes("pages")) return;
          dir = dir.replace(/\\/g, "/");
          let content = 'export * from "../components";\nexport * from "../modules";\n';
          if (dir.match(/src\/pages\/\w+/)) content = `export * from "../"`;
-         await fsp.writeFile(dir + "/index.js", content, "utf8");
+         write(dir + "/index.js", content);
       });
 }
 
@@ -115,10 +114,8 @@ function createIndexSvelte(pathname) {
       if (!exist(dirname)) return;
       if (!exist(path.join(dirname, "Index.svelte"))) {
          write(
-            path.join(
-               dirname,
-               "Index.svelte",
-               `<script>
+            path.join(dirname, "Index.svelte"),
+            `<script>
 \timport * as pages from "./pages";
 \timport { E404 } from "./";
 \texport let params = {};\n
@@ -130,7 +127,6 @@ function createIndexSvelte(pathname) {
 {:else}
 \t<E404/>
 {/if}`
-            )
          );
          createRoutes();
       }
@@ -138,7 +134,6 @@ function createIndexSvelte(pathname) {
 }
 
 function createPagesJS(pathname) {
-   // if (!ready) return;
    pathname = pathname.replaceAll("\\", "/");
    if (pathname.startsWith("src/pages")) {
       let isMatch = pathname.match(regex);
@@ -152,10 +147,7 @@ function createPagesJS(pathname) {
          files = files.filter((file) => file.match(regex));
          files = files.map((file) => {
             let filename = file.match(regex)[2];
-            let cmp = filename
-               .slice(1)
-               .replace(".svelte", "")
-               .replace(/[\-\+\:]/g, "_");
+            let cmp = filename.slice(1).replace(".svelte", "").replace(/[-+:]/g, "_");
             return `export { default as ${cmp} } from "./${filename}"\n`;
          });
          write(path.join(dirname, "pages.js"), files.join(""));
@@ -222,5 +214,5 @@ function createRoutes(pathname) {
       }
    });
    result2 += "]";
-   fsp.writeFile("src/routes.js", result1 + result2, "utf8");
+   write("src/routes.js", result1 + result2);
 }
