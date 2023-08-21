@@ -170,7 +170,7 @@ function createPagesJS(pathname) {
          files = files.filter((file) => file.match(regexC));
          files = files.map((file) => {
             let filename = file.match(regexC)[2];
-            let cmp = filename.replace(".svelte", "").replace(/[\-\+\:]/g, "_");
+            let cmp = filename.replace(".svelte", "").replace(/[-+:]/g, "_");
             return `export { default as ${cmp} } from "./${filename}"\n`;
          });
          write(path.join(dirname, "index.js"), files.join(""));
