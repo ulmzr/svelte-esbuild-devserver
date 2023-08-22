@@ -46,13 +46,6 @@ function routeAuto() {
       .on("add", (path) => createPagesJS(path))
       .on("unlink", (path) => createPagesJS(path))
       .on("unlinkDir", (path) => createRoutes(path));
-   // .on("addDir", (dir) => {
-   //    if (!dir.includes("pages")) return;
-   //    dir = dir.replace(/\\/g, "/");
-   //    let content = 'export * from "../components";\nexport * from "../modules";\n';
-   //    if (dir.match(/src\/pages\/\w+/)) content = `export * from "../"`;
-   //    write(dir + "/index.js", content);
-   // });
 }
 
 function createIndexSvelte(pathname) {
