@@ -20,67 +20,16 @@ const regexC = /(.+[^\/])\/([A-Z].*.svelte)/;
 const exist = (filepath) => fs.existsSync(filepath);
 const write = (filepath, content) => fs.writeFileSync(filepath, content, "utf8");
 
-serve({
-   port,
-   outdir,
-   watch: watchFiles,
-});
+if (watch) {
+   serve({
+      port,
+      outdir,
+      watch: watchFiles,
+   });
+   routeAuto();
+}
 
 buildApp();
-routeAuto();
-
-async function buildApp() {
-   const ctx = await esbuild.context({
-      entryPoints: ["src/main.js"],
-      bundle: true,
-      minify: !watch,
-      format: "iife",
-      outdir,
-      plugins: [sveltePlugin(), sassPlugin()],
-      ...esbuildConfig,
-   });
-   ctx.watch();
-   if (!watch) ctx.dispose();
-}
-
-function sveltePlugin() {
-   return {
-      name: "svelte",
-      setup(build) {
-         build.onLoad({ filter: /\.svelte$/ }, async (args) => {
-            // This converts a message in Svelte's format to esbuild's format
-            let convertMessage = ({ message, start, end }) => {
-               let location;
-               if (start && end) {
-                  let lineText = source.split(/\r\n|\r|\n/g)[start.line - 1];
-                  let lineEnd = start.line === end.line ? end.column : lineText.length;
-                  location = {
-                     file: filename,
-                     line: start.line,
-                     column: start.column,
-                     length: lineEnd - start.column,
-                     lineText,
-                  };
-               }
-               return { text: message, location };
-            };
-
-            // Load the file from the file system
-            let source = await fsp.readFile(args.path, "utf8");
-            let filename = path.relative(process.cwd(), args.path);
-
-            // Convert Svelte syntax to JavaScript
-            try {
-               let { js, warnings } = svelte.compile(source, { filename });
-               let contents = js.code + `//# sourceMappingURL=` + js.map.toUrl();
-               return { contents, warnings: warnings.map(convertMessage) };
-            } catch (e) {
-               return { errors: [convertMessage(e)] };
-            }
-         });
-      },
-   };
-}
 
 function routeAuto() {
    if (!autoroute) return;
@@ -96,14 +45,14 @@ function routeAuto() {
       .on("change", (path) => createPagesJS(path))
       .on("add", (path) => createPagesJS(path))
       .on("unlink", (path) => createPagesJS(path))
-      .on("unlinkDir", (path) => createRoutes(path))
-      .on("addDir", (dir) => {
-         if (!dir.includes("pages")) return;
-         dir = dir.replace(/\\/g, "/");
-         let content = 'export * from "../components";\nexport * from "../modules";\n';
-         if (dir.match(/src\/pages\/\w+/)) content = `export * from "../"`;
-         write(dir + "/index.js", content);
-      });
+      .on("unlinkDir", (path) => createRoutes(path));
+   // .on("addDir", (dir) => {
+   //    if (!dir.includes("pages")) return;
+   //    dir = dir.replace(/\\/g, "/");
+   //    let content = 'export * from "../components";\nexport * from "../modules";\n';
+   //    if (dir.match(/src\/pages\/\w+/)) content = `export * from "../"`;
+   //    write(dir + "/index.js", content);
+   // });
 }
 
 function createIndexSvelte(pathname) {
@@ -117,7 +66,7 @@ function createIndexSvelte(pathname) {
             path.join(dirname, "Index.svelte"),
             `<script>
 \timport * as pages from "./pages";
-\timport { E404 } from "./";
+\timport { E404 } from "@shared";
 \texport let params = {};\n
 \tlet page = pages.home;\n
 \t$: params, page = !params.page ? pages.home : pages[params.page?.replace(/[-+:]/g, "_")];
@@ -215,4 +164,58 @@ function createRoutes(pathname) {
    });
    result2 += "]";
    write("src/routes.js", result1 + result2);
+}
+
+async function buildApp() {
+   const ctx = await esbuild.context({
+      entryPoints: ["src/main.js"],
+      bundle: true,
+      minify: !watch,
+      format: "iife",
+      outdir,
+      plugins: [sveltePlugin(), sassPlugin()],
+      ...esbuildConfig,
+   });
+   ctx.watch();
+   console.log("Build...!");
+   if (!watch) ctx.dispose();
+}
+
+function sveltePlugin() {
+   return {
+      name: "svelte",
+      setup(build) {
+         build.onLoad({ filter: /\.svelte$/ }, async (args) => {
+            // This converts a message in Svelte's format to esbuild's format
+            let convertMessage = ({ message, start, end }) => {
+               let location;
+               if (start && end) {
+                  let lineText = source.split(/\r\n|\r|\n/g)[start.line - 1];
+                  let lineEnd = start.line === end.line ? end.column : lineText.length;
+                  location = {
+                     file: filename,
+                     line: start.line,
+                     column: start.column,
+                     length: lineEnd - start.column,
+                     lineText,
+                  };
+               }
+               return { text: message, location };
+            };
+
+            // Load the file from the file system
+            let source = await fsp.readFile(args.path, "utf8");
+            let filename = path.relative(process.cwd(), args.path);
+
+            // Convert Svelte syntax to JavaScript
+            try {
+               let { js, warnings } = svelte.compile(source, { filename });
+               let contents = js.code + `//# sourceMappingURL=` + js.map.toUrl();
+               return { contents, warnings: warnings.map(convertMessage) };
+            } catch (e) {
+               return { errors: [convertMessage(e)] };
+            }
+         });
+      },
+   };
 }
